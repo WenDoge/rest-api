@@ -36,6 +36,13 @@ type UserRepository struct {
 	pool *pgxpool.Pool
 }
 
+type UpdateUserParams struct {
+	Username    *string
+	Email       *string
+	Description *string
+	Age         *int
+}
+
 func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 	return &UserRepository{pool: pool}
 }
@@ -84,7 +91,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 	query := `
 		SELECT id, username, email, password, description, age, created_at, updated_at
 		FROM users
-		WHERE email = $1
+		WHERE email = $1 AND deleted_at IS NULL
 	`
 	var user models.User
 
@@ -117,7 +124,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, 
 	query := `
 		SELECT id, username, email, password, description, age, created_at, updated_at
 		FROM users
-		WHERE id = $1
+		WHERE id = $1 AND deleted_at IS NULL
 	`
 	var user models.User
 
@@ -156,7 +163,7 @@ func (r *UserRepository) List(ctx context.Context, opts ListUsersOptions) (*[]mo
 	countQuery := `
 		SELECT COUNT(*)
 		FROM users
-		WHERE username ILIKE '%' || $1 || '%'
+		WHERE username ILIKE '%' || $1 || '%' AND deleted_at IS NULL
 	`
 	var total int
 
@@ -167,7 +174,7 @@ func (r *UserRepository) List(ctx context.Context, opts ListUsersOptions) (*[]mo
 	query := `
 		SELECT id, username, email, description, age, created_at, updated_at
 		FROM users
-		WHERE username ILIKE '%' || $1 || '%'
+		WHERE username ILIKE '%' || $1 || '%' AND deleted_at IS NULL
 		ORDER BY created_at, id
 		LIMIT $2 OFFSET $3
 	`
@@ -205,4 +212,101 @@ func (r *UserRepository) List(ctx context.Context, opts ListUsersOptions) (*[]mo
 	}
 
 	return &users, total, nil
+}
+
+func (r *UserRepository) Update(ctx context.Context, userID string, params UpdateUserParams) (*models.User, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	var user models.User
+
+	query := `
+	UPDATE users
+	SET username = COALESCE($2, username), email = COALESCE($3, email), description = COALESCE($4, description), age = COALESCE($5,age), updated_at = NOW()
+	WHERE id = $1 AND deleted_at IS NULL
+	RETURNING id, username, email, description, age, created_at, updated_at
+	`
+
+	err := r.pool.QueryRow(ctx, query, userID, params.Username, params.Email, params.Description, params.Age).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.Description,
+		&user.Age,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrUserNotFound
+	}
+
+	if err != nil {
+		var pgErr *pgconn.PgError
+
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			if strings.Contains(err.Error(), "email") {
+				return nil, ErrEmailExists
+			}
+
+			return nil, ErrUserExists
+		}
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (r *UserRepository) Delete(ctx context.Context, id string) (*models.User, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	var user models.User
+
+	query := `
+		UPDATE users
+		SET deleted_at = NOW(), updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL
+		RETURNING id, username, email, description, age, created_at, updated_at, deleted_at
+	`
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback(ctx)
+
+	err = tx.QueryRow(ctx, query, id).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.Description,
+		&user.Age,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&user.DeletedAt,
+	)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	query = `
+		DELETE FROM refresh_tokens
+		WHERE user_id = $1
+	`
+
+	if _, err = tx.Exec(ctx, query, id); err != nil {
+		return nil, err
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }

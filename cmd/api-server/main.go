@@ -45,7 +45,7 @@ func main() {
 	userRepo := repository.NewUserRepository(pool)
 	tokenRepo := repository.NewTokenRepository(pool)
 
-	userHandler := handlers.NewUserHandler(userRepo)
+	userHandler := handlers.NewUserHandler(userRepo, config)
 	authHandler := handlers.NewAuthHandler(userRepo, tokenRepo, config)
 
 	authGroup := router.Group("/auth")
@@ -58,6 +58,8 @@ func main() {
 	usersGroup.Use(middleware.AuthMiddleware(config))
 	usersGroup.GET("", userHandler.List)
 	usersGroup.GET("/my", userHandler.GetMe)
+	usersGroup.PATCH("/my", userHandler.Update)
+	usersGroup.DELETE("/my", userHandler.Delete)
 
 	srv := &http.Server{
 		Addr:    ":" + config.Port,

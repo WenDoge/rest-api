@@ -12,6 +12,8 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id string) (*models.User, error)
 	List(ctx context.Context, opts repository.ListUsersOptions) (*[]models.User, int, error)
 	Create(ctx context.Context, user *models.User) (*models.User, error)
+	Delete(ctx context.Context, id string) (*models.User, error)
+	Update(ctx context.Context, userID string, params repository.UpdateUserParams) (*models.User, error)
 }
 
 type TokenRepository interface {
