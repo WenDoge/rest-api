@@ -10,13 +10,27 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/WenDoge/rest-api/docs"
 	"github.com/WenDoge/rest-api/internal/config"
 	"github.com/WenDoge/rest-api/internal/database"
 	"github.com/WenDoge/rest-api/internal/handlers"
 	"github.com/WenDoge/rest-api/internal/middleware"
 	"github.com/WenDoge/rest-api/internal/repository"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
+
+//	@title			Users API
+//	@version		1.0
+//	@description	регистрация, логин, профиль
+//	@host			localhost:8080
+//	@BasePath		/api/v1
+
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Формат: "Bearer <token>"
 
 var (
 	_ handlers.UserRepository  = (*repository.UserRepository)(nil)
@@ -35,8 +49,11 @@ func main() {
 	}
 
 	router := gin.Default()
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	router.GET("/", func(c *gin.Context) {
+	api := router.Group("/api/v1")
+
+	api.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "REST API is running",
 		})
@@ -48,13 +65,13 @@ func main() {
 	userHandler := handlers.NewUserHandler(userRepo, config)
 	authHandler := handlers.NewAuthHandler(userRepo, tokenRepo, config)
 
-	authGroup := router.Group("/auth")
+	authGroup := api.Group("/auth")
 	authGroup.POST("/register", authHandler.Register)
 	authGroup.POST("/login", authHandler.Login)
 	authGroup.POST("/refresh", authHandler.Refresh)
 	authGroup.POST("/logout", authHandler.Logout)
 
-	usersGroup := router.Group("/users")
+	usersGroup := api.Group("/users")
 	usersGroup.Use(middleware.AuthMiddleware(config))
 	usersGroup.GET("", userHandler.List)
 	usersGroup.GET("/my", userHandler.GetMe)

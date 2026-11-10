@@ -50,6 +50,18 @@ func NewAuthHandler(users UserRepository, tokens TokenRepository, cfg *config.Co
 	}
 }
 
+// Login аутентификация пользователя по email и паролю
+//
+//	@Summary	Логин
+//	@Tags		auth
+//	@Accept		json
+//	@Produce	json
+//	@Param		request	body		handlers.LoginRequest	true	"Данные аутентификации"
+//	@Success	200		{object}	handlers.AuthResponse
+//	@Failure	400		{object}	map[string]string
+//	@Failure	401		{object}	map[string]string
+//	@Failure	500		{object}	map[string]string
+//	@Router		/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var loginRequest LoginRequest
 
@@ -60,7 +72,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	user, err := h.users.GetByEmail(c.Request.Context(), loginRequest.Email)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "invalid credentials"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 			return
 		}
 
@@ -83,6 +95,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, authTokens)
 }
 
+// Register регистрация пользователя
+//
+//	@Summary	Регистрация
+//	@Tags		auth
+//	@Accept		json
+//	@Produce	json
+//	@Param		request	body		handlers.RegisterRequest	true	"Данные регистрации"
+//	@Success	201		{object}	handlers.RegisterResponse
+//	@Failure	400		{object}	map[string]string
+//	@Failure	409		{object}	map[string]string
+//	@Failure	500		{object}	map[string]string
+//	@Router		/auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
 	var request RegisterRequest
 
@@ -120,7 +144,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	authTokens, err := h.generateAndSetTokens(c, user)
+	authTokens, err := h.generateAndSetTokens(c, createdUser)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "generate tokens error"})
 		return
@@ -150,6 +174,19 @@ func (h *AuthHandler) generateAndSetTokens(c *gin.Context, user *models.User) (*
 	return &AuthResponse{AccessToken: tokens.AccessToken, AccessExpiresAt: tokens.AccessExpiresAt}, nil
 }
 
+// Refresh обновление токенов
+//
+//	@Summary		Обновление токенов
+//	@Tags			auth
+//	@Produce		json
+//	@Success		200	{object}	handlers.AuthResponse
+//
+//	@Description	Refresh-токен берётся из httpOnly-cookie "refresh_token"
+//
+//	@Failure		401	{object}	map[string]string
+//	@Failure		404	{object}	map[string]string
+//	@Failure		500	{object}	map[string]string
+//	@Router			/auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	refreshTokenString, err := c.Cookie("refresh_token")
 	if err != nil {
@@ -229,6 +266,18 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	c.JSON(http.StatusOK, AuthResponse{AccessToken: tokens.AccessToken, AccessExpiresAt: tokens.AccessExpiresAt})
 }
 
+// Logout разлогинивание пользователя
+//
+//	@Summary		Выход
+//	@Tags			auth
+//	@Produce		json
+//
+//	@Description	Refresh-токен берётся из httpOnly-cookie "refresh_token"
+//	@Success		204	"No Content"
+//
+//	@Failure		401	{object}	map[string]string
+//	@Failure		500	{object}	map[string]string
+//	@Router			/auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
 	refreshTokenString, err := c.Cookie("refresh_token")
 	if err != nil {

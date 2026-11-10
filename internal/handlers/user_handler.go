@@ -45,6 +45,17 @@ func NewUserHandler(users UserRepository, cfg *config.Config) *UserHandler {
 	return &UserHandler{users: users, cfg: cfg}
 }
 
+// GetMe получение профиля текущего пользователя
+//
+//	@Summary	Мой профиль
+//	@Tags		users
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Success	200	{object}	models.User
+//	@Failure	401	{object}	map[string]string
+//	@Failure	404	{object}	map[string]string
+//	@Failure	500	{object}	map[string]string
+//	@Router		/users/my [get]
 func (h *UserHandler) GetMe(c *gin.Context) {
 	userID := c.GetString(middleware.UserIDKey)
 	if userID == "" {
@@ -67,6 +78,20 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// List список пользователей с пагинацией и фильтром по username
+//
+//	@Summary	Список пользователей
+//	@Tags		users
+//	@Produce	json
+//	@Security	BearerAuth
+//	@Param		username	query		string	false	"Фильтр по username"
+//	@Param		limit		query		int		false	"Размер страницы"	default(20)	minimum(1)	maximum(100)
+//	@Param		offset		query		int		false	"Смещение"			default(0)	minimum(0)
+//	@Success	200			{object}	handlers.ListUsersResponse
+//	@Failure	400			{object}	map[string]string
+//	@Failure	401			{object}	map[string]string
+//	@Failure	500			{object}	map[string]string
+//	@Router		/users [get]
 func (h *UserHandler) List(c *gin.Context) {
 	var query ListUsersQuery
 
@@ -106,6 +131,22 @@ func (h *UserHandler) List(c *gin.Context) {
 	})
 }
 
+// Update частичное обновление профиля текущего пользователя
+//
+//	@Summary		Обновление профиля
+//	@Description	Частичное обновление, передаются только те поля, которые нужно изменить
+//	@Tags			users
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		handlers.UpdateRequest	true	"Изменяемые поля"
+//	@Success		200		{object}	models.User
+//	@Failure		400		{object}	map[string]string
+//	@Failure		401		{object}	map[string]string
+//	@Failure		404		{object}	map[string]string
+//	@Failure		409		{object}	map[string]string
+//	@Failure		500		{object}	map[string]string
+//	@Router			/users/my [patch]
 func (h *UserHandler) Update(c *gin.Context) {
 	var request UpdateRequest
 
@@ -151,6 +192,18 @@ func (h *UserHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// Delete мягкое удаление текущего пользователя
+//
+//	@Summary		Удаление профиля
+//	@Description	пользователь помечается удалённым, refresh-cookie очищается
+//	@Tags			users
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	models.User
+//	@Failure		401	{object}	map[string]string
+//	@Failure		404	{object}	map[string]string
+//	@Failure		500	{object}	map[string]string
+//	@Router			/users/my [delete]
 func (h *UserHandler) Delete(c *gin.Context) {
 	userID := c.GetString(middleware.UserIDKey)
 
