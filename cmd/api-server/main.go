@@ -51,7 +51,7 @@ func main() {
 	router := gin.Default()
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	api := router.Group("/api/v1")
+	api := router.Group(handlers.APIPrefix)
 
 	api.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{

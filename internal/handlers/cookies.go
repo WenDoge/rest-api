@@ -9,7 +9,7 @@ import (
 )
 
 const refreshCookieName = "refresh_token"
-const refreshCookiePath = "/auth"
+const refreshCookiePath = APIPrefix + "/auth"
 
 func SetRefreshCookie(c *gin.Context, cfg *config.Config, tokens *auth.TokenPair) {
 	c.SetSameSite(http.SameSiteStrictMode)
