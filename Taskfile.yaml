@@ -5,9 +5,9 @@ dotenv: ['.env']
 tasks:
   docker:
     cmds:
-      - docker compose up
-      # - docker compose up -d
-      # - go run ./cmd/api-server
+      # - docker compose up
+      - docker compose up -d
+      - go run ./cmd/api-server
   server:
     cmds:
       - go run ./cmd/api-server
